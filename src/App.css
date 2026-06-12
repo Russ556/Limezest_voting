@@ -129,6 +129,14 @@ button {
   backdrop-filter: blur(18px);
 }
 
+.hero-grid.page-card {
+  background:
+    radial-gradient(circle at 72% 42%, rgba(250, 206, 104, 0.18), transparent 22rem),
+    radial-gradient(circle at 12% 16%, rgba(136, 211, 176, 0.18), transparent 18rem),
+    linear-gradient(135deg, rgba(255, 247, 223, 0.9) 0%, rgba(239, 249, 231, 0.9) 52%, rgba(226, 243, 236, 0.9) 100%);
+  border-color: rgba(255, 250, 232, 0.86);
+}
+
 .hero-grid {
   max-width: 1180px;
   margin: 0 auto;
