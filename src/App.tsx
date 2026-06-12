@@ -93,10 +93,11 @@ function App() {
     () => rooms.map((room) => ({ ...room, memberCount: participants.filter((participant) => participant.room_id === room.id).length })),
     [rooms, participants],
   )
-  const myVote = useMemo(
-    () => roomVotes.find((vote) => vote.participant_id === currentParticipantId) || null,
+  const myVotes = useMemo(
+    () => roomVotes.filter((vote) => vote.participant_id === currentParticipantId),
     [roomVotes, currentParticipantId],
   )
+  const myVote = myVotes[0] || null
   const totalVotes = new Set(roomVotes.map((vote) => vote.participant_id)).size
 
   const statusCopy = {
@@ -291,9 +292,40 @@ function App() {
   const voteForHobby = async (hobbyId: string) => {
     if (!currentRoomId || !currentParticipantId || currentRoom?.status !== 'voting') return
 
+    const existingVote = myVotes.find((vote) => vote.hobby_id === hobbyId)
+
+    if (currentRoom.vote_mode === 'multi') {
+      if (existingVote) {
+        const { error } = await supabase.from('votes').delete().eq('id', existingVote.id)
+        if (error) {
+          setNotice('투표 해제에 실패했습니다.')
+          return
+        }
+        setSelectedVote(null)
+      } else {
+        const { error } = await supabase.from('votes').insert({
+          room_id: currentRoomId,
+          hobby_id: hobbyId,
+          participant_id: currentParticipantId,
+          score: null,
+        })
+        if (error) {
+          setNotice('투표에 실패했습니다.')
+          return
+        }
+        setSelectedVote(hobbyId)
+      }
+
+      await fetchAll()
+      return
+    }
+
     if (myVote) {
       const { error } = await supabase.from('votes').update({ hobby_id: hobbyId }).eq('id', myVote.id)
-      if (error) setNotice('투표 변경에 실패했습니다.')
+      if (error) {
+        setNotice('투표 변경에 실패했습니다.')
+        return
+      }
     } else {
       const { error } = await supabase.from('votes').insert({
         room_id: currentRoomId,
@@ -301,7 +333,10 @@ function App() {
         participant_id: currentParticipantId,
         score: voteMode === 'score' ? 5 : null,
       })
-      if (error) setNotice('투표에 실패했습니다.')
+      if (error) {
+        setNotice('투표에 실패했습니다.')
+        return
+      }
     }
 
     setSelectedVote(hobbyId)
@@ -498,7 +533,7 @@ function App() {
             ) : (
               <div className="hobby-grid">
                 {currentHobbies.map((hobby) => {
-                  const selected = myVote?.hobby_id === hobby.id || selectedVote === hobby.id
+                  const selected = myVotes.some((vote) => vote.hobby_id === hobby.id) || selectedVote === hobby.id
                   return (
                     <article className={`hobby-card ${selected ? 'selected' : ''}`} key={hobby.id}>
                       <div className="hobby-topline">
@@ -509,7 +544,7 @@ function App() {
                       <p>{hobby.description}</p>
                       {currentRoom.status === 'voting' && (
                         <button className="vote-button" onClick={() => voteForHobby(hobby.id)}>
-                          {selected ? '선택 완료' : '이 취미에 투표'}
+                          {selected ? (currentRoom.vote_mode === 'multi' ? '선택 해제' : '선택 완료') : '이 취미에 투표'}
                         </button>
                       )}
                       {currentRoom.status === 'result' && currentRoom.show_voter_names && (
