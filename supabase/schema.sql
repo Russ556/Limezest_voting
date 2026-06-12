@@ -60,21 +60,37 @@ alter table public.admin_users enable row level security;
 
 -- MVP용 공개 정책: 인증 없이 방/참여자/소재/투표를 읽고 생성/수정 가능.
 -- 정식 출시 전에는 익명 세션 토큰/방 호스트 토큰 기반으로 더 잠그는 것을 권장합니다.
+drop policy if exists "rooms public read" on public.rooms;
+drop policy if exists "rooms public insert" on public.rooms;
+drop policy if exists "rooms public update" on public.rooms;
+drop policy if exists "rooms public delete" on public.rooms;
 create policy "rooms public read" on public.rooms for select using (true);
 create policy "rooms public insert" on public.rooms for insert with check (true);
 create policy "rooms public update" on public.rooms for update using (true) with check (true);
 create policy "rooms public delete" on public.rooms for delete using (true);
 
+drop policy if exists "participants public read" on public.participants;
+drop policy if exists "participants public insert" on public.participants;
+drop policy if exists "participants public update" on public.participants;
+drop policy if exists "participants public delete" on public.participants;
 create policy "participants public read" on public.participants for select using (true);
 create policy "participants public insert" on public.participants for insert with check (true);
 create policy "participants public update" on public.participants for update using (true) with check (true);
 create policy "participants public delete" on public.participants for delete using (true);
 
+drop policy if exists "hobbies public read" on public.hobbies;
+drop policy if exists "hobbies public insert" on public.hobbies;
+drop policy if exists "hobbies public update" on public.hobbies;
+drop policy if exists "hobbies public delete" on public.hobbies;
 create policy "hobbies public read" on public.hobbies for select using (true);
 create policy "hobbies public insert" on public.hobbies for insert with check (true);
 create policy "hobbies public update" on public.hobbies for update using (true) with check (true);
 create policy "hobbies public delete" on public.hobbies for delete using (true);
 
+drop policy if exists "votes public read" on public.votes;
+drop policy if exists "votes public insert" on public.votes;
+drop policy if exists "votes public update" on public.votes;
+drop policy if exists "votes public delete" on public.votes;
 create policy "votes public read" on public.votes for select using (true);
 create policy "votes public insert" on public.votes for insert with check (true);
 create policy "votes public update" on public.votes for update using (true) with check (true);
@@ -96,7 +112,34 @@ before update on public.rooms
 for each row execute function public.set_updated_at();
 
 -- 실시간 구독용 publication 등록
-alter publication supabase_realtime add table public.rooms;
-alter publication supabase_realtime add table public.participants;
-alter publication supabase_realtime add table public.hobbies;
-alter publication supabase_realtime add table public.votes;
+-- 이미 등록된 테이블이 있어도 재실행 가능하도록 처리합니다.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'rooms'
+  ) then
+    alter publication supabase_realtime add table public.rooms;
+  end if;
+
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'participants'
+  ) then
+    alter publication supabase_realtime add table public.participants;
+  end if;
+
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'hobbies'
+  ) then
+    alter publication supabase_realtime add table public.hobbies;
+  end if;
+
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'votes'
+  ) then
+    alter publication supabase_realtime add table public.votes;
+  end if;
+end $$;
