@@ -60,6 +60,7 @@ function App() {
   const [showAdmin, setShowAdmin] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showDeleteRoom, setShowDeleteRoom] = useState(false)
   const [showNames, setShowNames] = useState(false)
   const [selectedVote, setSelectedVote] = useState<number | null>(null)
   const [hobbyName, setHobbyName] = useState('')
@@ -100,6 +101,16 @@ function App() {
     ])
     setHobbyName('')
     setHobbyDesc('')
+  }
+
+  const deleteRoom = () => {
+    setShowDeleteRoom(false)
+    setShowSettings(false)
+    setShowNames(false)
+    setSelectedVote(null)
+    setRoomStatus('waiting')
+    setHobbies(initialHobbies)
+    setPhase('lobby')
   }
 
   const statusCopy = {
@@ -224,6 +235,7 @@ function App() {
               </div>
               <div className="room-tools">
                 {role === 'host' && <button className="ghost-button" onClick={() => setShowSettings(true)}>방 설정</button>}
+                {role === 'host' && <button className="danger-button" onClick={() => setShowDeleteRoom(true)}>방 삭제</button>}
                 {role === 'host' && <button className="danger-button" onClick={() => setPhase('lobby')}>퇴장</button>}
               </div>
             </div>
@@ -328,6 +340,19 @@ function App() {
           <p className="modal-copy">투표 시작 전까지만 투표 방식을 수정할 수 있습니다.</p>
           <SettingsFields voteMode={voteMode} setVoteMode={setVoteMode} revealMode={revealMode} setRevealMode={setRevealMode} disabled={roomStatus !== 'waiting'} />
           <button className="primary-button wide" onClick={() => setShowSettings(false)}>저장</button>
+        </Modal>
+      )}
+
+      {showDeleteRoom && (
+        <Modal title="방 삭제" onClose={() => setShowDeleteRoom(false)}>
+          <div className="warning-card">
+            <strong>이 방을 삭제할까요?</strong>
+            <p>삭제하면 방 목록에서 사라지고, 참여자·취미 소재·투표 데이터도 함께 정리되는 흐름으로 연결됩니다.</p>
+          </div>
+          <div className="button-row split-actions">
+            <button className="secondary-button" onClick={() => setShowDeleteRoom(false)}>취소</button>
+            <button className="danger-button" onClick={deleteRoom}>방 삭제하기</button>
+          </div>
         </Modal>
       )}
 

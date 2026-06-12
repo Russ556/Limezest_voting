@@ -359,6 +359,10 @@ textarea:focus {
   justify-content: flex-end;
 }
 
+.split-actions {
+  justify-content: space-between;
+}
+
 .primary-button,
 .secondary-button,
 .ghost-button,
@@ -722,6 +726,27 @@ textarea:focus {
   display: grid;
   gap: 20px;
   margin: 20px 0;
+}
+
+.warning-card {
+  margin-top: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  background: #fff0eb;
+  color: #7d2d19;
+  box-shadow: inset 0 0 0 1px rgba(182, 71, 45, 0.14);
+}
+
+.warning-card strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.warning-card p {
+  margin: 0;
+  color: #8f5948;
+  line-height: 1.65;
 }
 
 @media (max-width: 940px) {
