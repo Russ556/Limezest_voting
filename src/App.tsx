@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { supabase } from './lib/supabase'
 
@@ -77,6 +77,9 @@ function App() {
   const [hobbyDesc, setHobbyDesc] = useState('')
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
+  const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null)
+  const [resultsReady, setResultsReady] = useState(false)
+  const suppressMissingRoomNoticeRef = useRef(false)
 
   const displayName = nickname.trim() || (role === 'host' ? '호스트' : '참여자')
   const currentRoom = useMemo(() => rooms.find((room) => room.id === currentRoomId) || null, [rooms, currentRoomId])
@@ -99,6 +102,13 @@ function App() {
   )
   const myVote = myVotes[0] || null
   const totalVotes = new Set(roomVotes.map((vote) => vote.participant_id)).size
+  const winnerHobby = useMemo(() => {
+    if (currentHobbies.length === 0) return null
+    return [...currentHobbies].sort(
+      (a, b) => votes.filter((vote) => vote.hobby_id === b.id).length - votes.filter((vote) => vote.hobby_id === a.id).length,
+    )[0]
+  }, [currentHobbies, votes])
+  const winnerVoteCount = winnerHobby ? votes.filter((vote) => vote.hobby_id === winnerHobby.id).length : 0
 
   const statusCopy = {
     waiting: '소재 모집 중',
@@ -144,14 +154,56 @@ function App() {
 
   useEffect(() => {
     if (currentRoomId && !rooms.some((room) => room.id === currentRoomId)) {
+      const shouldSuppressNotice = suppressMissingRoomNoticeRef.current
+      suppressMissingRoomNoticeRef.current = false
       setCurrentRoomId(null)
       setCurrentParticipantId(null)
       setSelectedVote(null)
+      setCountdownRemaining(null)
+      setResultsReady(false)
       setShowDeleteRoom(false)
       setPhase('lobby')
-      setNotice('방이 삭제되어 로비로 이동했습니다.')
+      if (!shouldSuppressNotice) {
+        setNotice('방이 삭제되어 로비로 이동했습니다.')
+      }
     }
   }, [rooms, currentRoomId])
+
+  useEffect(() => {
+    if (!currentRoom) {
+      setCountdownRemaining(null)
+      setResultsReady(false)
+      return
+    }
+
+    if (currentRoom.status !== 'result') {
+      setCountdownRemaining(null)
+      setResultsReady(false)
+      return
+    }
+
+    if (currentRoom.reveal_mode !== 'countdown') {
+      setCountdownRemaining(null)
+      setResultsReady(true)
+      return
+    }
+
+    setResultsReady(false)
+    setCountdownRemaining(5)
+    let remaining = 5
+    const timer = window.setInterval(() => {
+      remaining -= 1
+      if (remaining <= 0) {
+        window.clearInterval(timer)
+        setCountdownRemaining(null)
+        setResultsReady(true)
+        return
+      }
+      setCountdownRemaining(remaining)
+    }, 1000)
+
+    return () => window.clearInterval(timer)
+  }, [currentRoom?.id, currentRoom?.status, currentRoom?.reveal_mode])
 
   const enterWithRole = (nextRole: Role) => {
     setRole(nextRole)
@@ -206,6 +258,8 @@ function App() {
     const createdRoom = room as Room
     const hostParticipant = participant as Participant
 
+    suppressMissingRoomNoticeRef.current = true
+    setNotice('')
     setRooms((prevRooms) => [createdRoom, ...prevRooms.filter((item) => item.id !== createdRoom.id)])
     setParticipants((prevParticipants) => [
       ...prevParticipants.filter((item) => item.id !== hostParticipant.id),
@@ -244,17 +298,21 @@ function App() {
     setRevealMode(targetRoom.reveal_mode)
     setRoomPrivate(targetRoom.is_private)
     setSelectedVote(null)
+    setNotice('')
     setPhase('room')
     await fetchAll()
   }
 
   const leaveRoom = async () => {
+    suppressMissingRoomNoticeRef.current = true
     if (currentParticipantId) {
       await supabase.from('participants').delete().eq('id', currentParticipantId)
     }
     setCurrentRoomId(null)
     setCurrentParticipantId(null)
     setSelectedVote(null)
+    setCountdownRemaining(null)
+    setResultsReady(false)
     setPhase('lobby')
     await fetchAll()
   }
@@ -287,6 +345,27 @@ function App() {
       return
     }
     await fetchAll()
+  }
+
+  const clearRoomVotes = async () => {
+    if (!currentRoomId) return false
+    const { error } = await supabase.from('votes').delete().eq('room_id', currentRoomId)
+    if (error) {
+      setNotice('기존 투표 초기화에 실패했습니다.')
+      return false
+    }
+    setSelectedVote(null)
+    return true
+  }
+
+  const restartVoting = async () => {
+    if (!(await clearRoomVotes())) return
+    await updateRoom({ status: 'voting', show_voter_names: false })
+  }
+
+  const backToCollecting = async () => {
+    if (!(await clearRoomVotes())) return
+    await updateRoom({ status: 'waiting', show_voter_names: false })
   }
 
   const voteForHobby = async (hobbyId: string) => {
@@ -353,9 +432,12 @@ function App() {
     }
 
     if (roomId === currentRoomId) {
+      suppressMissingRoomNoticeRef.current = true
       setCurrentRoomId(null)
       setCurrentParticipantId(null)
       setSelectedVote(null)
+      setCountdownRemaining(null)
+      setResultsReady(false)
       setShowDeleteRoom(false)
       setShowSettings(false)
       setPhase('lobby')
@@ -509,24 +591,28 @@ function App() {
               </div>
             )}
 
-            {currentRoom.status === 'result' && currentRoom.reveal_mode === 'countdown' && (
-              <div className="countdown-card">
-                <span>5</span>
-                <p>초 뒤 결과 공개 액션 예시</p>
+            {currentRoom.status === 'result' && resultsReady && winnerHobby && (
+              <div className="winner-stage">
+                <span className="winner-burst">🎉</span>
+                <small>오늘의 1위 취미</small>
+                <strong>{winnerHobby.title}</strong>
+                <p>{winnerVoteCount}표로 가장 많은 선택을 받았어요!</p>
               </div>
             )}
 
-            <div className="add-hobby-card">
-              <div>
-                <h3>취미 소재 추가</h3>
-                <p>취미 이름과 2~3줄 소개를 입력하면 카드로 쌓입니다.</p>
+            {currentRoom.status === 'waiting' && (
+              <div className="add-hobby-card">
+                <div>
+                  <h3>취미 소재 추가</h3>
+                  <p>취미 이름과 2~3줄 소개를 입력하면 카드로 쌓입니다.</p>
+                </div>
+                <div className="hobby-form">
+                  <input value={hobbyName} onChange={(e) => setHobbyName(e.target.value)} placeholder="취미 이름" />
+                  <textarea value={hobbyDesc} onChange={(e) => setHobbyDesc(e.target.value)} placeholder="2~3줄 소개를 적어주세요" rows={3} />
+                  <button className="primary-button" onClick={addHobby}>소재 추가</button>
+                </div>
               </div>
-              <div className="hobby-form">
-                <input value={hobbyName} onChange={(e) => setHobbyName(e.target.value)} placeholder="취미 이름" />
-                <textarea value={hobbyDesc} onChange={(e) => setHobbyDesc(e.target.value)} placeholder="2~3줄 소개를 적어주세요" rows={3} />
-                <button className="primary-button" onClick={addHobby}>소재 추가</button>
-              </div>
-            </div>
+            )}
 
             {currentHobbies.length === 0 ? (
               <EmptyState title="아직 추가된 소재가 없습니다" copy="호스트나 참여자가 소재를 추가하면 이곳에 카드가 생깁니다." />
@@ -535,10 +621,10 @@ function App() {
                 {currentHobbies.map((hobby) => {
                   const selected = myVotes.some((vote) => vote.hobby_id === hobby.id) || selectedVote === hobby.id
                   return (
-                    <article className={`hobby-card ${selected ? 'selected' : ''}`} key={hobby.id}>
+                    <article className={`hobby-card ${selected ? 'selected' : ''} ${resultsReady && winnerHobby?.id === hobby.id ? 'winner-card' : ''}`} key={hobby.id}>
                       <div className="hobby-topline">
                         <span>{participants.find((participant) => participant.id === hobby.author_participant_id)?.nickname || '익명'}</span>
-                        {currentRoom.status === 'result' && <b>{getVoteCount(hobby.id)}표</b>}
+                        {currentRoom.status === 'result' && resultsReady && <b>{getVoteCount(hobby.id)}표</b>}
                       </div>
                       <h3>{hobby.title}</h3>
                       <p>{hobby.description}</p>
@@ -547,7 +633,7 @@ function App() {
                           {selected ? (currentRoom.vote_mode === 'multi' ? '선택 해제' : '선택 완료') : '이 취미에 투표'}
                         </button>
                       )}
-                      {currentRoom.status === 'result' && currentRoom.show_voter_names && (
+                      {currentRoom.status === 'result' && resultsReady && currentRoom.show_voter_names && (
                         <small className="voters">투표자: {getVoterNames(hobby.id) || '아직 없음'}</small>
                       )}
                     </article>
@@ -560,7 +646,9 @@ function App() {
               {currentRoom.status === 'waiting' && role === 'host' && <button className="primary-button" onClick={() => updateRoom({ status: 'voting' })}>투표 시작</button>}
               {currentRoom.status === 'voting' && role === 'host' && <button className="primary-button" onClick={() => updateRoom({ status: 'closed' })}>투표 종료</button>}
               {currentRoom.status === 'closed' && role === 'host' && <button className="primary-button" onClick={() => updateRoom({ status: 'result' })}>결과 보기</button>}
-              {currentRoom.status === 'result' && role === 'host' && <button className="secondary-button" onClick={() => updateRoom({ show_voter_names: !currentRoom.show_voter_names })}>{currentRoom.show_voter_names ? '투표자 숨기기' : '누가 어디에 투표했는지 공개하기'}</button>}
+              {currentRoom.status === 'result' && resultsReady && role === 'host' && <button className="secondary-button" onClick={() => updateRoom({ show_voter_names: !currentRoom.show_voter_names })}>{currentRoom.show_voter_names ? '투표자 숨기기' : '누가 어디에 투표했는지 공개하기'}</button>}
+              {currentRoom.status === 'result' && resultsReady && role === 'host' && <button className="primary-button" onClick={restartVoting}>투표 다시 진행하기</button>}
+              {currentRoom.status === 'result' && resultsReady && role === 'host' && <button className="secondary-button" onClick={backToCollecting}>소재 추가로 돌아가기</button>}
             </div>
           </div>
 
@@ -584,6 +672,19 @@ function App() {
             )}
           </aside>
         </section>
+      )}
+
+      {phase === 'room' && currentRoom && countdownRemaining !== null && (
+        <div className="countdown-overlay" aria-live="polite">
+          <div className="countdown-confetti confetti-a" />
+          <div className="countdown-confetti confetti-b" />
+          <div className="countdown-confetti confetti-c" />
+          <div className="countdown-motion-card">
+            <span>결과 공개까지</span>
+            <strong>{countdownRemaining}</strong>
+            <p>두근두근... 오늘의 1위 취미가 곧 공개됩니다!</p>
+          </div>
+        </div>
       )}
 
       {showCreate && (
