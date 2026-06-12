@@ -196,19 +196,27 @@ function App() {
       .select()
       .single()
 
-    setLoading(false)
-
     if (participantError || !participant) {
+      setLoading(false)
       setNotice('호스트 입장 처리에 실패했습니다.')
       return
     }
 
+    const createdRoom = room as Room
+    const hostParticipant = participant as Participant
+
+    setRooms((prevRooms) => [createdRoom, ...prevRooms.filter((item) => item.id !== createdRoom.id)])
+    setParticipants((prevParticipants) => [
+      ...prevParticipants.filter((item) => item.id !== hostParticipant.id),
+      hostParticipant,
+    ])
     setCurrentRoomId(room.id)
     setCurrentParticipantId(participant.id)
     setRoomName('')
     setRoomPassword('')
     setShowCreate(false)
     setPhase('room')
+    setLoading(false)
     await fetchAll()
   }
 
@@ -398,7 +406,7 @@ function App() {
           <p>방 안에서 참여자 목록과 취미 카드 작성자에 표시됩니다.</p>
           <label className="input-label">
             닉네임
-            <input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="예: 학종" maxLength={12} />
+            <input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="닉네임 입력" maxLength={12} />
           </label>
           <div className="button-row">
             <button className="secondary-button" onClick={() => setPhase('landing')}>뒤로</button>
