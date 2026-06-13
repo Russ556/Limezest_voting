@@ -506,7 +506,7 @@ function App() {
           </div>
           <div className="hero-visual" aria-label="취미 영업소 미리보기">
             <div className="hero-image-card">
-              <img src="/assets/sales-open-hero.png" alt="지금 영업 개시 이미지" onError={(event) => { event.currentTarget.style.display = 'none' }} />
+              <img src="/assets/sales-open.png" alt="지금 영업 개시 이미지" onError={(event) => { event.currentTarget.style.display = 'none' }} />
               <div className="hero-image-fallback">
                 <span>OPEN</span>
                 <strong>지금 영업 개시!</strong>

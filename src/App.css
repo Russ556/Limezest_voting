@@ -256,17 +256,15 @@ button {
 
 .hero-image-card {
   position: relative;
-  width: min(100%, 560px);
-  aspect-ratio: 16 / 10;
+  width: clamp(340px, 34vw, 430px);
+  aspect-ratio: 1122 / 1402;
   display: grid;
   place-items: center;
   overflow: hidden;
-  border-radius: 42px;
-  background:
-    radial-gradient(circle at 62% 48%, rgba(255, 204, 91, 0.24), transparent 18rem),
-    linear-gradient(135deg, #5c665b 0%, #cfd4b5 56%, #6a7568 100%);
-  border: 10px solid rgba(255, 255, 255, 0.68);
-  box-shadow: 0 28px 80px rgba(47, 84, 57, 0.18);
+  border-radius: 34px;
+  background: #fbf8df;
+  border: 10px solid rgba(255, 255, 255, 0.76);
+  box-shadow: 0 28px 80px rgba(47, 84, 57, 0.18), 18px 22px 0 rgba(54, 82, 62, 0.08);
 }
 
 .hero-image-card img {
@@ -1011,7 +1009,7 @@ textarea:focus {
   }
 
   .hero-image-card {
-    width: min(100%, 640px);
+    width: min(86vw, 390px);
   }
 
   .participant-panel {
