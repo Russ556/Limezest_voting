@@ -506,10 +506,10 @@ function App() {
           </div>
           <div className="hero-visual" aria-label="취미 영업소 미리보기">
             <div className="hero-image-card">
-              <img src="/assets/hobby-hero.svg" alt="취미 피켓을 든 LIMEZEST 캐릭터" onError={(event) => { event.currentTarget.style.display = 'none' }} />
+              <img src="/assets/sales-open-hero.png" alt="지금 영업 개시 이미지" onError={(event) => { event.currentTarget.style.display = 'none' }} />
               <div className="hero-image-fallback">
-                <span>HOBBY</span>
-                <strong>취미를 영업하는<br />LIMEZEST 캐릭터</strong>
+                <span>OPEN</span>
+                <strong>지금 영업 개시!</strong>
               </div>
             </div>
           </div>
